@@ -3,24 +3,33 @@
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
+#include <errno.h>
+
+#define SYSCALL(r,c,e) { \
+    r=c;                 \
+    if(r==-1){perror(e); _exit(errno);} \
+    }
+
+
 
 volatile sig_atomic_t sigint_count = 0;
 volatile sig_atomic_t sigtstp_count = 0;
 
+int err;
+
 
 static void sigint_handler(int signum){
-    sigint_count++;
+    sigint_count+=1;
 }
 
 static void sigtstp_handler(int signum){
-    write(STDOUT_FILENO, (void *) &sigint_count, sizeof(sigint_count));
+    SYSCALL(err, write(STDOUT_FILENO, (void*)sigint_count, sizeof(volatile sig_atomic_t)), "error on write");
     sigtstp_count++;
-    exit(EXIT_SUCCESS);
 }
 
 void sigalrm_handler(int signum){
-    write(STDOUT_FILENO, "Time's up! Process terminated by SIGALRM", 41);
-    exit(EXIT_SUCCESS);
+    write(STDOUT_FILENO, "Time's up! Process terminated by SIGALRM\n", 42);
+    _exit(EXIT_SUCCESS);
 }
 
 
@@ -65,9 +74,10 @@ int main(int argc, char **argv){
     }
     else{
         alarm(5);
+        while(1){
+
+        }
     }
-
-
 
 
     return 0;
