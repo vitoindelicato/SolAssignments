@@ -23,7 +23,7 @@ static void sigint_handler(int signum){
 }
 
 static void sigtstp_handler(int signum){
-    SYSCALL(err, write(STDOUT_FILENO, (void*)sigint_count, sizeof(volatile sig_atomic_t)), "error on write");
+    //write(STDOUT_FILENO, (int*)&sigint_count, sizeof(sigint_count));
     sigtstp_count++;
 }
 
@@ -35,34 +35,53 @@ void sigalrm_handler(int signum){
 
 int main(int argc, char **argv){
 
-    struct sigaction sigint, sigtstp, sigalrm;
+    sigset_t set;
+    int sig;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
 
-    memset(&sigint, 0, sizeof(sigint));
-    memset(&sigtstp, 0, sizeof(sigtstp));
-    memset(&sigalrm, 0, sizeof(sigalrm));
+    sigemptyset(&set);
+    sigaddset(&set, SIGTSTP);
+    // sigprocmask(SIG_BLOCK, &set, NULL); --> still have to fully understand this command
+    // pthread_sigmask(SIG_SETMASK, &set, NULL); -->right now this is not necessary.
 
 
-    sigint.sa_handler = sigint_handler;
-    if ( sigaction(SIGINT, &sigint, NULL) == -1 ) {
+    sa.sa_handler = sigint_handler;
+    if ( sigaction(SIGINT, &sa, NULL) == -1 ) {
         perror("Couldn't set SIGINT handler");
         exit(EXIT_FAILURE);
     }
 
-    sigtstp.sa_handler = sigtstp_handler;
-    if ( sigaction(SIGTSTP, &sigtstp, NULL) == -1 ) {
+    /* --> this is moved on main, I wait for ctrl-z, and I execute handler in main with no limitations.
+     * with this handler, i wasn't able to properly print the number of SIGINT received.
+
+    sa.sa_handler = sigtstp_handler;
+    if ( sigaction(SIGTSTP, &sa, NULL) == -1 ) {
         perror("Couldn't set SIGTSTP handler");
         exit(EXIT_FAILURE);
     }
+     */
 
 
-    sigalrm.sa_handler = sigalrm_handler;
-    if ( sigaction(SIGALRM, &sigalrm, NULL) == -1 ) {
+    sa.sa_handler = sigalrm_handler;
+    if ( sigaction(SIGALRM, &sa, NULL) == -1 ) {
         perror("Couldn't set SIGALRM handler");
         exit(EXIT_FAILURE);
     }
 
 
-    while(sigtstp_count < 3){
+    while(1){
+
+        sigwait(&set, &sig);
+        printf("Arrived SIGTSTP, number of SIGINT is:   %d\n", sigint_count);
+
+        if(sigtstp_count < 2){
+            sigtstp_count += 1;
+            continue;
+        }
+        else{
+            break;
+        }
     }
 
     char response = 'n';
@@ -75,7 +94,6 @@ int main(int argc, char **argv){
     else{
         alarm(5);
         while(1){
-
         }
     }
 
